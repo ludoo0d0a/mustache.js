@@ -1,3 +1,6 @@
+// Hacked version to add global helpers with $
+// Other way is https://github.com/janl/mustache.js/issues/277
+
 /*!
  * mustache.js - Logic-less {{mustache}} templates with JavaScript
  * http://github.com/janl/mustache.js
@@ -24,7 +27,7 @@
   var nonSpaceRe = /\S/;
   var eqRe = /\s*=/;
   var curlyRe = /\s*\}/;
-  var tagRe = /#|\^|\/|>|\{|&|=|!/;
+  var tagRe = /#|\$|\^|\/|>|\{|&|=|!/;
 
   // Workaround for https://issues.apache.org/jira/browse/COUCHDB-577
   // See https://github.com/janl/mustache.js/issues/189
@@ -128,8 +131,8 @@
   Context.prototype.push = function (view) {
     return new Context(view, this);
   };
-
-  Context.prototype.lookup = function (name) {
+	
+  Context.prototype.lookup = function (name, root) {
     var value = this._cache[name];
 
     if (!value) {
@@ -140,7 +143,7 @@
 
         while (context) {
           if (name.indexOf('.') > 0) {
-            value = context.view;
+            value = root || context.view;
             var names = name.split('.'), i = 0;
             while (value && i < names.length) {
               value = value[names[i++]];
@@ -233,6 +236,18 @@
       tokenValue = token[1];
 
       switch (token[0]) {
+//Hack to support global helpers
+      case '$':
+      	var globalFn = context.lookup(tokenValue, window);
+      	if (globalFn){
+			value = renderTokens(token[4], writer, context, template);
+			value = globalFn.call(context.view, value, function (template) {
+				return writer.render(template, context);
+			});
+			if (value != null) buffer += value;
+        }
+          
+      	break;
       case '#':
         value = context.lookup(tokenValue);
 
@@ -302,6 +317,8 @@
       token = tokens[i];
       switch (token[0]) {
       case '#':
+      case '$':
+//Hack
       case '^':
         sections.push(token);
         collector.push(token);
@@ -440,7 +457,8 @@
       token = [type, value, start, scanner.pos];
       tokens.push(token);
 
-      if (type === '#' || type === '^') {
+//Hack
+      if (type === '#' || type === '^' || type === '$') {
         sections.push(token);
       } else if (type === '/') {
         // Check section nesting.
@@ -467,7 +485,7 @@
   }
 
   mustache.name = "mustache.js";
-  mustache.version = "0.7.2";
+  mustache.version = "0.7.2b";
   mustache.tags = ["{{", "}}"];
 
   mustache.Scanner = Scanner;
