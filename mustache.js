@@ -1,4 +1,8 @@
-// Hacked version to add global helpers with $
+// https://github.com/ludoo0d0a/mustache.js
+// Hacked version : 
+// add global helpers by wrapping text result with a pair {{$fn}}data{{/fn}}
+// add global helpers associated with value by adding  ,fn
+//
 // Other way is https://github.com/janl/mustache.js/issues/277
 
 /*!
@@ -133,7 +137,7 @@
   };
 	
   Context.prototype.lookup = function (name, root) {
-    var value = this._cache[name];
+    var fn, value = this._cache[name];
 
     if (!value) {
       if (name == '.') {
@@ -142,6 +146,19 @@
         var context = this;
 
         while (context) {
+          
+          //Hack2 : add global helpers call on object
+    	  if (name.indexOf(',') > 0) {
+    		  var names = name.split(',');
+    		  name = names[0]; 
+    		  fn = names[1];
+    		  var fns = fn.split('.'),i=0;
+    		  fn=window;//TODO
+	          while (fn && i < fns.length) {
+	              fn = fn[fns[i++]];
+	          }
+          }
+          	
           if (name.indexOf('.') > 0) {
             value = root || context.view;
             var names = name.split('.'), i = 0;
@@ -149,8 +166,12 @@
               value = value[names[i++]];
             }
           } else {
-            value = context.view[name];
+        	  value = context.view[name];
           }
+
+          if (typeof value === 'function') value = value.call(this.view);
+          
+          if (typeof fn === 'function') value = fn.call(this.view, value, name);
 
           if (value != null) break;
 
@@ -179,8 +200,13 @@
     var fn = this._cache[template];
 
     if (!fn) {
-      var tokens = mustache.parse(template, tags);
-      fn = this._cache[template] = this.compileTokens(tokens, template);
+      if (typeof template === 'function'){
+      	fn = template;
+      }else{
+      	var tokens = mustache.parse(template, tags);
+      	fn = this.compileTokens(tokens, template);
+      }
+      this._cache[template]=fn;
     }
 
     return fn;
@@ -485,7 +511,7 @@
   }
 
   mustache.name = "mustache.js";
-  mustache.version = "0.7.2b";
+  mustache.version = "0.7.2";
   mustache.tags = ["{{", "}}"];
 
   mustache.Scanner = Scanner;
